@@ -41,7 +41,7 @@ lib/
 1. **Cài đặt Flutter SDK:** https://docs.flutter.dev/get-started/install
 2. **Clone repository:**
    ```bash
-   git clone https://github.com/your-repo/football_booking_flutter.git
+   git clone https://github.com/vinhdangtapcode/FootballBookingFlutter.git
    ```
 3. **Cài đặt dependencies:**
    ```bash
