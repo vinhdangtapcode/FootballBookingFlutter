@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import '../models/field.dart';
 import '../services/api_service.dart';
-import '../services/map_service.dart';
 import 'location_picker_screen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-class AddEditFieldScreen extends StatefulWidget {
+class AdminAddEditFieldScreen extends StatefulWidget {
   @override
-  _AddEditFieldScreenState createState() => _AddEditFieldScreenState();
+  _AdminAddEditFieldScreenState createState() => _AdminAddEditFieldScreenState();
 }
 
-class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
+class _AdminAddEditFieldScreenState extends State<AdminAddEditFieldScreen> {
   final _formKey = GlobalKey<FormState>();
   TextEditingController nameController = TextEditingController();
   TextEditingController addressController = TextEditingController();
@@ -85,12 +84,18 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
       );
       if (field == null) {
         // Tạo mới sân
-        ApiService.createField(newField).then((success) {
+        ApiService.adminCreateField(newField).then((success) {
           setState(() {
             isLoading = false;
           });
           if (success) {
-            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('✅ Tạo sân thành công!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+            Navigator.pop(context, true); // Trả về true để báo hiệu cần refresh
           } else {
             ScaffoldMessenger.of(context)
                 .showSnackBar(SnackBar(content: Text("Field creation failed")));
@@ -98,12 +103,18 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
         });
       } else {
         // Cập nhật sân
-        ApiService.updateField(newField).then((success) {
+        ApiService.adminUpdateField(newField).then((success) {
           setState(() {
             isLoading = false;
           });
           if (success) {
-            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('✅ Cập nhật sân thành công!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+            Navigator.pop(context, true); // Trả về true để báo hiệu cần refresh
           } else {
             ScaffoldMessenger.of(context)
                 .showSnackBar(SnackBar(content: Text("Field update failed")));
@@ -127,7 +138,7 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
       );
 
       // Debug logging
-      print('Add Edit Field - Received result from LocationPicker:');
+      print('Admin Add Edit Field - Received result from LocationPicker:');
       print('result: $result');
       print('result type: ${result.runtimeType}');
 
@@ -200,87 +211,17 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
     }
   }
 
-  // Cải thiện method để xem vị trí trên bản đồ
-  Future<void> _viewOnMap() async {
-    String address = addressController.text.trim();
-    if (address.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Vui lòng nhập địa chỉ hoặc chọn vị trí trên bản đồ trước'),
-          backgroundColor: Colors.orange,
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-
-    // Hiển thị loading
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            ),
-            SizedBox(width: 16),
-            Text('Đang mở Google Maps...'),
-          ],
-        ),
-        duration: Duration(seconds: 2),
-        backgroundColor: Colors.blue,
-      ),
-    );
-
-    try {
-      await MapService.openDirectionsWithAddress(address);
-
-      // Nếu đến được đây nghĩa là đã mở thành công, hiển thị thông báo thành công
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Đã mở Google Maps thành công'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 1),
-        ),
-      );
-    } catch (e) {
-      print('Error opening maps: $e');
-      // Chỉ hiển thị lỗi khi thực sự không thể mở Maps
-      if (e.toString().contains('Không thể mở Google Maps')) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Không thể mở Google Maps. Vui lòng kiểm tra kết nối internet hoặc cài đặt Google Maps.'),
-            backgroundColor: Colors.red,
-            action: SnackBarAction(
-              label: 'Thử lại',
-              textColor: Colors.white,
-              onPressed: _viewOnMap,
-            ),
-            duration: Duration(seconds: 4),
-          ),
-        );
-      } else {
-        // Với các lỗi khác, chỉ log và không hiển thị cho user
-        print('Maps opened but with minor issues: $e');
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     String title = field == null ? "Thêm sân mới" : "Chỉnh sửa sân";
     return Scaffold(
       appBar: AppBar(
-        title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber[800])),
-        backgroundColor: Colors.white,
+        title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        backgroundColor: Colors.green,
         elevation: 0,
-        iconTheme: IconThemeData(color: Colors.amber[800]),
+        iconTheme: IconThemeData(color: Colors.white),
       ),
-      backgroundColor: Color(0xFFF8F8F8),
+      backgroundColor: Colors.grey[100],
       body: Padding(
         padding: EdgeInsets.all(20),
         child: Form(
@@ -291,7 +232,7 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
               children: [
                 Container(
                   alignment: Alignment.center,
-                  child: Icon(Icons.sports_soccer, color: Colors.amber, size: 60),
+                  child: Icon(Icons.admin_panel_settings, color: Colors.green, size: 60),
                 ),
                 SizedBox(height: 24),
                 TextFormField(
@@ -300,7 +241,7 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
                     labelText: "Tên sân",
                     prefixIcon: Icon(Icons.sports_soccer, color: Colors.green[700]),
                     filled: true,
-                    fillColor: Colors.amber[50],
+                    fillColor: Colors.white,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   validator: (value) => value!.isEmpty ? "Bắt buộc" : null,
@@ -311,8 +252,8 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
                   controller: addressController,
                   readOnly: true, // Không cho phép nhập thủ công
                   decoration: InputDecoration(
-                    labelText: "Địa chỉ",
-                    hintText: "Vui lòng chọn vị trí",
+                    labelText: "Địa chỉ (bấm vào icon để chọn)",
+                    hintText: "Bấm vào icon bản đồ để chọn vị trí",
                     prefixIcon: Icon(Icons.location_on, color: Colors.redAccent),
                     filled: true,
                     fillColor: selectedLocation != null ? Colors.green[50] : Colors.grey[100],
@@ -323,11 +264,16 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
                         padding: EdgeInsets.all(8),
                         child: selectedLocation != null
                             ? Icon(Icons.check_circle, color: Colors.green, size: 28)
-                            : Icon(Icons.map_outlined, color: Colors.blue[600], size: 28),
+                            : Icon(Icons.map_outlined, color: Colors.green, size: 28),
                       ),
                     ),
                   ),
                   validator: (value) {
+                    // Nếu đang edit sân và đã có địa chỉ, không cần validate selectedLocation
+                    if (field != null && value != null && value.isNotEmpty) {
+                      return null; // Đã có địa chỉ từ trước, không cần chọn lại
+                    }
+                    // Nếu đang tạo mới hoặc chưa có địa chỉ thì mới kiểm tra selectedLocation
                     if (value == null || value.isEmpty || selectedLocation == null) {
                       return "Vui lòng chọn vị trí trên bản đồ";
                     }
@@ -380,7 +326,7 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
                     labelText: "Loại sân",
                     prefixIcon: Icon(Icons.category, color: Colors.blueAccent),
                     filled: true,
-                    fillColor: Colors.amber[50],
+                    fillColor: Colors.white,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                 ),
@@ -391,7 +337,7 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
                     labelText: "Tiện ích",
                     prefixIcon: Icon(Icons.wifi, color: Colors.teal),
                     filled: true,
-                    fillColor: Colors.amber[50],
+                    fillColor: Colors.white,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                 ),
@@ -402,7 +348,7 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
                     labelText: "Giá mỗi giờ (VNĐ)",
                     prefixIcon: Icon(Icons.attach_money, color: Colors.deepOrange),
                     filled: true,
-                    fillColor: Colors.amber[50],
+                    fillColor: Colors.white,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   keyboardType: TextInputType.number,
@@ -415,7 +361,7 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
                     labelText: "Chiều dài (m)",
                     prefixIcon: Icon(Icons.straighten, color: Colors.green),
                     filled: true,
-                    fillColor: Colors.amber[50],
+                    fillColor: Colors.white,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   keyboardType: TextInputType.number,
@@ -427,7 +373,7 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
                     labelText: "Chiều rộng (m)",
                     prefixIcon: Icon(Icons.straighten, color: Colors.blue),
                     filled: true,
-                    fillColor: Colors.amber[50],
+                    fillColor: Colors.white,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   keyboardType: TextInputType.number,
@@ -446,7 +392,7 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
                     labelText: "Loại cỏ",
                     prefixIcon: Icon(Icons.grass, color: Colors.teal),
                     filled: true,
-                    fillColor: Colors.amber[50],
+                    fillColor: Colors.white,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                 ),
@@ -477,7 +423,7 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
                     labelText: "Giờ mở cửa (HH:mm)",
                     prefixIcon: Icon(Icons.access_time, color: Colors.purple),
                     filled: true,
-                    fillColor: Colors.amber[50],
+                    fillColor: Colors.white,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   keyboardType: TextInputType.datetime,
@@ -508,29 +454,44 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
                     labelText: "Giờ đóng cửa (HH:mm)",
                     prefixIcon: Icon(Icons.access_time, color: Colors.deepPurple),
                     filled: true,
-                    fillColor: Colors.amber[50],
+                    fillColor: Colors.white,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   keyboardType: TextInputType.datetime,
                 ),
                 SizedBox(height: 18),
-                SwitchListTile(
-                  value: available,
-                  onChanged: (val) => setState(() => available = val),
-                  title: Text("Có sẵn để đặt?", style: TextStyle(fontWeight: FontWeight.w500)),
-                  secondary: Icon(Icons.check_circle, color: Colors.green),
-                  activeColor: Colors.amber,
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: SwitchListTile(
+                    value: available,
+                    onChanged: (val) => setState(() => available = val),
+                    title: Text("Có sẵn để đặt?", style: TextStyle(fontWeight: FontWeight.w500)),
+                    secondary: Icon(Icons.check_circle, color: Colors.green),
+                    activeColor: Colors.green,
+                  ),
                 ),
-                SwitchListTile(
-                  value: outdoor,
-                  onChanged: (val) => setState(() => outdoor = val),
-                  title: Text("Sân ngoài trời?", style: TextStyle(fontWeight: FontWeight.w500)),
-                  secondary: Icon(Icons.wb_sunny, color: Colors.orange),
-                  activeColor: Colors.amber,
+                SizedBox(height: 18),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: SwitchListTile(
+                    value: outdoor,
+                    onChanged: (val) => setState(() => outdoor = val),
+                    title: Text("Sân ngoài trời?", style: TextStyle(fontWeight: FontWeight.w500)),
+                    secondary: Icon(Icons.wb_sunny, color: Colors.orange),
+                    activeColor: Colors.green,
+                  ),
                 ),
                 SizedBox(height: 32),
                 isLoading
-                    ? Center(child: CircularProgressIndicator(color: Colors.amber))
+                    ? Center(child: CircularProgressIndicator(color: Colors.green))
                     : SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
@@ -538,7 +499,7 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
                           icon: Icon(field == null ? Icons.add : Icons.save, color: Colors.white),
                           label: Text(field == null ? "Thêm sân" : "Lưu thay đổi"),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.amber,
+                            backgroundColor: Colors.green,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -550,11 +511,11 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
                 if (field != null)
                   OutlinedButton.icon(
                     onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.cancel, color: Colors.amber),
+                    icon: Icon(Icons.cancel, color: Colors.green),
                     label: Text("Hủy"),
                     style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: Colors.amber, width: 2),
-                      foregroundColor: Colors.amber,
+                      side: BorderSide(color: Colors.green, width: 2),
+                      foregroundColor: Colors.green,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -568,3 +529,5 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
     );
   }
 }
+
+

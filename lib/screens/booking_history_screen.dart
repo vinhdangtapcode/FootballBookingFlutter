@@ -76,7 +76,7 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
                 borderRadius: BorderRadius.circular(8.0),
                 child: booking.field.imageUrl?.isEmpty ?? true
                     ? Image.asset(
-                  'assets/images/san_bong.png',
+                  'lib/assets/images/san_bong.png',
                   width: 120,
                   height: 120,
                   fit: BoxFit.cover,
@@ -88,9 +88,7 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) {
                     return Image.asset(
-                      'assets/images/san_bong.png',
-                      width: 120,
-                      height: 120,
+                      'lib/assets/images/san_bong.png',
                       fit: BoxFit.cover,
                     );
                   },

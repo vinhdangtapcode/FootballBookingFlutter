@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/field.dart';
 import '../services/api_service.dart';
+import '../services/map_service.dart';
 
 class FieldDetailScreen extends StatefulWidget {
   @override
@@ -41,11 +42,41 @@ class _FieldDetailScreenState extends State<FieldDetailScreen> {
   }
 
   void bookField() {
+    // Kiểm tra tình trạng sân trước khi cho phép đặt
+    if (field?.available != true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sân không sẵn sàng để đặt'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
     Navigator.pushNamed(context, '/booking', arguments: field);
   }
 
   void viewRatings() {
     Navigator.pushNamed(context, '/ratings', arguments: field);
+  }
+
+  // Thêm các method mới cho Maps
+  void viewOnMap() {
+    Navigator.pushNamed(context, '/map', arguments: field);
+  }
+
+  Future<void> openDirections() async {
+    try {
+      await MapService.openDirectionsWithAddress(field!.address);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Không thể mở chỉ đường: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -95,7 +126,7 @@ class _FieldDetailScreenState extends State<FieldDetailScreen> {
                 image: DecorationImage(
                   image: (field!.imageUrl?.isNotEmpty ?? false)
                       ? NetworkImage(field!.imageUrl!)
-                      : const AssetImage('assets/images/san_bong.png') as ImageProvider,
+                      : const AssetImage('lib/assets/images/san_bong.png') as ImageProvider,
                   fit: BoxFit.cover,
                 ),
               ),
@@ -241,36 +272,76 @@ class _FieldDetailScreenState extends State<FieldDetailScreen> {
             // Action buttons
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: bookField,
-                      icon: const Icon(Icons.calendar_month),
-                      label: const Text("Đặt sân"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.amber,
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  // Hàng đầu tiên: Đặt sân và Xem đánh giá
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: bookField,
+                          icon: const Icon(Icons.calendar_month),
+                          label: const Text("Đặt sân"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.amber,
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: viewRatings,
+                          icon: const Icon(Icons.star, color: Colors.amber),
+                          label: const Text("Xem đánh giá"),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.amber, width: 2),
+                            foregroundColor: Colors.amber,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: viewRatings,
-                      icon: const Icon(Icons.star, color: Colors.amber),
-                      label: const Text("Xem đánh giá"),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Colors.amber, width: 2),
-                        foregroundColor: Colors.amber,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  const SizedBox(height: 16),
+                  // Hàng thứ hai: Xem bản đồ và Chỉ đường
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: viewOnMap,
+                          icon: const Icon(Icons.map, color: Colors.white),
+                          label: const Text("Xem bản đồ"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue[600],
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: openDirections,
+                          icon: const Icon(Icons.directions, color: Colors.white),
+                          label: const Text("Chỉ đường"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green[600],
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

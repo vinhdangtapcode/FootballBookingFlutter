@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'dart:math';
 import '../models/field.dart';
 import '../services/api_service.dart';
 
@@ -11,7 +14,10 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Field> fields = [];
   List<Field> filteredFields = [];
   List<Field> highRatedFields = [];
+  List<Field> nearbyFields = [];
   bool isLoading = false;
+  bool isLoadingLocation = false;
+  Position? currentPosition;
   int _currentIndex = 0; //Lưu trạng thái NavBar
   String _sortType = 'none';
   String _sortOrder = 'desc';
@@ -32,6 +38,147 @@ class _HomeScreenState extends State<HomeScreen> {
       filteredFields = fetchedFields;
       highRatedFields = fetchedFields.where((f) => (f.rating ?? 0) >= 4).toList();
       isLoading = false;
+    });
+  }
+
+  // Tính khoảng cách giữa 2 điểm (Haversine formula)
+  double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const double earthRadius = 6371; // Bán kính Trái Đất tính bằng km
+
+    double dLat = (lat2 - lat1) * (pi / 180);
+    double dLon = (lon2 - lon1) * (pi / 180);
+
+    double a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(lat1 * (pi / 180)) * cos(lat2 * (pi / 180)) *
+        sin(dLon / 2) * sin(dLon / 2);
+
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    double distance = earthRadius * c;
+
+    return distance;
+  }
+
+  // Yêu cầu quyền vị trí và lấy vị trí hiện tại
+  Future<void> getCurrentLocation() async {
+    setState(() {
+      isLoadingLocation = true;
+    });
+
+    try {
+      // Kiểm tra quyền vị trí
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Quyền truy cập vị trí bị từ chối')),
+          );
+          setState(() {
+            isLoadingLocation = false;
+          });
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Quyền truy cập vị trí bị từ chối vĩnh viễn. Vui lòng cấp quyền trong cài đặt.'),
+            action: SnackBarAction(
+              label: 'Cài đặt',
+              onPressed: () => Geolocator.openAppSettings(),
+            ),
+          ),
+        );
+        setState(() {
+          isLoadingLocation = false;
+        });
+        return;
+      }
+
+      // Lấy vị trí hiện tại
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      setState(() {
+        currentPosition = position;
+      });
+
+      // Tính khoảng cách và sắp xếp sân gần nhất
+      await calculateNearbyFields();
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể lấy vị trí hiện tại: $e')),
+      );
+    } finally {
+      setState(() {
+        isLoadingLocation = false;
+      });
+    }
+  }
+
+  // Chuyển đổi địa chỉ thành tọa độ và tính khoảng cách
+  Future<void> calculateNearbyFields() async {
+    if (currentPosition == null) return;
+
+    List<Field> fieldsWithDistance = [];
+
+    for (Field field in fields) {
+      try {
+        String? address = field.address;
+        if (address != null && address.isNotEmpty) {
+          // Sử dụng geocoding để chuyển địa chỉ thành tọa độ
+          List<Location> locations = await locationFromAddress(address);
+
+          if (locations.isNotEmpty) {
+            Location location = locations.first;
+            double distance = calculateDistance(
+              currentPosition!.latitude,
+              currentPosition!.longitude,
+              location.latitude,
+              location.longitude,
+            );
+
+            // Tạo field copy với distance và tọa độ
+            Field fieldWithDistance = Field(
+              id: field.id,
+              name: field.name,
+              address: field.address,
+              type: field.type,
+              facilities: field.facilities,
+              pricePerHour: field.pricePerHour,
+              rating: field.rating,
+              openingTime: field.openingTime,
+              closingTime: field.closingTime,
+              grassType: field.grassType,
+              length: field.length,
+              width: field.width,
+              available: field.available,
+              outdoor: field.outdoor,
+              owner: field.owner,
+              imageUrl: field.imageUrl,
+              latitude: location.latitude,
+              longitude: location.longitude,
+              distance: distance,
+            );
+
+            fieldsWithDistance.add(fieldWithDistance);
+          }
+        }
+      } catch (e) {
+        // Nếu không thể geocode, bỏ qua sân này
+        print('Không thể chuyển đổi địa chỉ "${field.address}": $e');
+        continue;
+      }
+    }
+
+    // Sắp xếp theo khoảng cách gần nhất
+    fieldsWithDistance.sort((a, b) => (a.distance ?? double.infinity).compareTo(b.distance ?? double.infinity));
+
+    setState(() {
+      nearbyFields = fieldsWithDistance;
     });
   }
 
@@ -57,6 +204,9 @@ class _HomeScreenState extends State<HomeScreen> {
       list.sort((a, b) => _sortOrder == 'asc'
           ? (a.rating ?? 0).compareTo(b.rating ?? 0)
           : (b.rating ?? 0).compareTo(a.rating ?? 0));
+    } else {
+      // Mặc định: sắp xếp theo tên sân (tăng dần, không phân biệt hoa thường)
+      list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     }
     setState(() {
       filteredFields = list;
@@ -171,7 +321,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   unselectedLabelColor: Colors.amber, // Chữ đen cho các tab không chọn
                   tabs: [
                     Tab(text: 'Tất cả sân'),
-                    Tab(text: 'Sân đánh giá cao'),
+                    Tab(text: 'Sân gần bạn'),
                   ],
                 ),
               ),
@@ -212,19 +362,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                       child:
                                           (field.imageUrl?.isEmpty ?? true)
                                               ? Image.asset(
-                                                'assets/images/san_bong.png',
+                                                'lib/assets/images/san_bong.png',
                                                 fit: BoxFit.cover,
                                               )
                                               : Image.network(
                                                 field.imageUrl!,
                                                 fit: BoxFit.cover,
-                                                errorBuilder: (
-                                                  context,
-                                                  error,
-                                                  stackTrace,
-                                                ) {
+                                                errorBuilder: (context, error, stackTrace) {
                                                   return Image.asset(
-                                                    'assets/images/san_bong.png',
+                                                    'lib/assets/images/san_bong.png',
                                                     fit: BoxFit.cover,
                                                   );
                                                 },
@@ -275,11 +421,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                               ),
                                             ),
                                             const Spacer(),
-                                            Text(
-                                              '${field.pricePerHour.toInt()} VNĐ/giờ',
-                                              style: const TextStyle(
-                                                fontFamily: 'Roboto',
-                                              ),
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.monetization_on, color: Colors.green[600], size: 16),
+                                                const SizedBox(width: 2),
+                                                Text(
+                                                  '${field.pricePerHour.toInt()} VNĐ/giờ',
+                                                  style: const TextStyle(
+                                                    fontFamily: 'Roboto',
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),
@@ -287,9 +440,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                   ),
                                   // Icon trailing (nếu muốn hiển thị)
-                                  const Icon(
-                                    Icons.check_circle,
-                                    color: Colors.green,
+                                  Icon(
+                                    field.available == true ? Icons.check_circle : Icons.cancel,
+                                    color: field.available == true ? Colors.green : Colors.red,
                                   ),
                                 ],
                               ),
@@ -301,121 +454,276 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
 
-            // Tab "Sân đánh giá cao": chỉ hiển thị sân 4 sao trở lên
+            // Tab "Sân gần bạn": hiển thị sân theo khoảng cách gần nhất
             isLoading
                 ? Center(child: CircularProgressIndicator())
-                : highRatedFields.isEmpty
-                  ? Center(child: Text('Chưa có sân nào đạt 4 sao trở lên.', style: TextStyle(fontFamily: 'Roboto', fontSize: 16)))
-                  : ListView.builder(
-                      itemCount: highRatedFields.length,
-                      itemBuilder: (context, index) {
-                        Field field = highRatedFields[index];
-                        return Card(
-                          margin: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-                          child: InkWell(
-                            onTap: () => navigateToFieldDetails(field),
-                            child: LayoutBuilder(
-                              builder: (context, constraints) {
-                                double imageWidth = constraints.maxWidth / 5;
-                                return Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Container(
-                                        width: imageWidth,
-                                        height: imageWidth * 0.75,
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(8.0),
-                                          child:
-                                              (field.imageUrl?.isEmpty ?? true)
+                : currentPosition == null
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.location_off,
+                            size: 80,
+                            color: Colors.grey[400],
+                          ),
+                          SizedBox(height: 16),
+                          Text(
+                            'Bật vị trí để xem sân gần bạn',
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Chúng tôi cần quyền truy cập vị trí để\nhiển thị các sân gần nhất với bạn',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 14,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                          SizedBox(height: 24),
+                          ElevatedButton.icon(
+                            onPressed: isLoadingLocation ? null : getCurrentLocation,
+                            icon: isLoadingLocation
+                                ? SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : Icon(Icons.my_location),
+                            label: Text(
+                              isLoadingLocation ? 'Đang lấy vị trí...' : 'Bật vị trí',
+                              style: TextStyle(fontFamily: 'Roboto'),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.amber,
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : isLoadingLocation
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(
+                              color: Colors.amber,
+                              strokeWidth: 3,
+                            ),
+                            SizedBox(height: 20),
+                            Text(
+                              'Đang tìm kiếm sân gần bạn...',
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Vui lòng đợi trong giây lát',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
+                                fontSize: 14,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : nearbyFields.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.location_searching,
+                              size: 80,
+                              color: Colors.grey[400],
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'Không tìm thấy sân gần bạn',
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Các sân chưa có thông tin vị trí\nhoặc không có sân nào trong khu vực',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
+                                fontSize: 14,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: () async {
+                          await getCurrentLocation();
+                        },
+                        child: ListView.builder(
+                          itemCount: nearbyFields.length,
+                          itemBuilder: (context, index) {
+                            Field field = nearbyFields[index];
+                            return Card(
+                              margin: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                              child: InkWell(
+                                onTap: () => navigateToFieldDetails(field),
+                                child: LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    double imageWidth = constraints.maxWidth / 5;
+                                    return Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            width: imageWidth,
+                                            height: imageWidth * 0.75,
+                                            child: ClipRRect(
+                                              borderRadius: BorderRadius.circular(8.0),
+                                              child: (field.imageUrl?.isEmpty ?? true)
                                                   ? Image.asset(
-                                                    'assets/images/san_bong.png',
+                                                    'lib/assets/images/san_bong.png',
                                                     fit: BoxFit.cover,
                                                   )
                                                   : Image.network(
                                                     field.imageUrl!,
                                                     fit: BoxFit.cover,
-                                                    errorBuilder: (
-                                                      context,
-                                                      error,
-                                                      stackTrace,
-                                                    ) {
+                                                    errorBuilder: (context, error, stackTrace) {
                                                       return Image.asset(
-                                                        'assets/images/san_bong.png',
+                                                        'lib/assets/images/san_bong.png',
                                                         fit: BoxFit.cover,
                                                       );
                                                     },
                                                   ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              field.name,
-                                              style: const TextStyle(
-                                                fontFamily: 'Roboto',
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold,
-                                              ),
                                             ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              field.address ?? '',
-                                              style: TextStyle(
-                                                fontFamily: 'Roboto',
-                                                fontSize: 14,
-                                                color: Colors.grey[600],
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Row(
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                const Icon(
-                                                  Icons.star,
-                                                  size: 16,
-                                                  color: Colors.yellow,
-                                                ),
-                                                const SizedBox(width: 4),
                                                 Text(
-                                                  field.rating != null
-                                                      ? (field.rating % 1 == 0
-                                                          ? field.rating.toInt().toString()
-                                                          : field.rating.toStringAsFixed(1))
-                                                      : '0',
+                                                  field.name,
                                                   style: const TextStyle(
                                                     fontFamily: 'Roboto',
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.bold,
                                                   ),
                                                 ),
-                                                const Spacer(),
+                                                const SizedBox(height: 4),
                                                 Text(
-                                                  '${field.pricePerHour.toInt()} VNĐ/giờ',
-                                                  style: const TextStyle(
+                                                  field.address ?? '',
+                                                  style: TextStyle(
                                                     fontFamily: 'Roboto',
+                                                    fontSize: 14,
+                                                    color: Colors.grey[600],
                                                   ),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                // Hiển thị đánh giá, khoảng cách và giá tiền trên cùng 1 dòng
+                                                Row(
+                                                  children: [
+                                                    // Đánh giá
+                                                    const Icon(
+                                                      Icons.star,
+                                                      size: 16,
+                                                      color: Colors.yellow,
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      field.rating != null
+                                                          ? (field.rating % 1 == 0
+                                                              ? field.rating.toInt().toString()
+                                                              : field.rating.toStringAsFixed(1))
+                                                          : '0',
+                                                      style: const TextStyle(
+                                                        fontFamily: 'Roboto',
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+
+                                                    // Spacer
+                                                    const SizedBox(width: 12),
+
+                                                    // Khoảng cách
+                                                    Icon(
+                                                      Icons.location_on,
+                                                      size: 16,
+                                                      color: Colors.blue[600],
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      field.distance != null
+                                                          ? '${field.distance!.toStringAsFixed(1)} km'
+                                                          : 'N/A',
+                                                      style: TextStyle(
+                                                        fontFamily: 'Roboto',
+                                                        fontSize: 12,
+                                                        color: Colors.blue[600],
+                                                        fontWeight: FontWeight.w500,
+                                                      ),
+                                                    ),
+
+                                                    const Spacer(),
+
+                                                    // Giá tiền
+                                                    Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Icon(Icons.monetization_on, color: Colors.green[600], size: 16),
+                                                        const SizedBox(width: 2),
+                                                        Text(
+                                                          '${field.pricePerHour.toInt()} VNĐ/giờ',
+                                                          style: const TextStyle(
+                                                            fontFamily: 'Roboto',
+                                                            fontSize: 12,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
                                                 ),
                                               ],
                                             ),
-                                          ],
-                                        ),
+                                          ),
+                                          // Icon hiển thị trạng thái sân
+                                          Icon(
+                                            field.available == true ? Icons.check_circle : Icons.cancel,
+                                            color: field.available == true ? Colors.green : Colors.red,
+                                          ),
+                                        ],
                                       ),
-                                      const Icon(
-                                        Icons.star,
-                                        color: Colors.amber,
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
           ],
         ),
         bottomNavigationBar: null,

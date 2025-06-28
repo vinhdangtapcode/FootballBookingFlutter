@@ -46,6 +46,10 @@ class Field {
   bool? available;
   bool? outdoor;
   Owner? owner;
+  String? imageUrl;
+  double? latitude;
+  double? longitude;
+  double? distance; // Khoảng cách từ vị trí hiện tại (km)
 
   Field({
     this.id,
@@ -63,6 +67,10 @@ class Field {
     this.available,
     this.outdoor,
     this.owner,
+    this.imageUrl,
+    this.latitude,
+    this.longitude,
+    this.distance,
   }) : _rating = rating;
 
   factory Field.fromJson(Map<String, dynamic> json){
@@ -84,12 +92,13 @@ class Field {
       available: json['available'] is bool ? json['available'] : (json['available'] == 1 || json['available'] == 'true'),
       outdoor: json['outdoor'] is bool ? json['outdoor'] : (json['outdoor'] == 1 || json['outdoor'] == 'true'),
       owner: json['owner'] != null ? Owner.fromJson(json['owner']) : null,
+      imageUrl: json['imageUrl'],
+      latitude: (json['latitude'] is num) ? json['latitude'].toDouble() : (json['latitude'] != null ? double.tryParse(json['latitude'].toString()) : null),
+      longitude: (json['longitude'] is num) ? json['longitude'].toDouble() : (json['longitude'] != null ? double.tryParse(json['longitude'].toString()) : null),
     );
   }
 
   get rating => _rating;
-
-  get imageUrl => null;
 
   Map<String, dynamic> toJson(){
     return {
@@ -99,6 +108,7 @@ class Field {
       'type': type,
       'facilities': facilities,
       'pricePerHour': pricePerHour,
+      'rating': _rating,
       'openingTime': openingTime,
       'closingTime': closingTime,
       'grassType': grassType,
@@ -106,7 +116,10 @@ class Field {
       'width': width,
       'available': available,
       'outdoor': outdoor,
-      if (owner != null) 'owner': owner!.toJson(),
+      'owner': owner?.toJson(),
+      'imageUrl': imageUrl,
+      'latitude': latitude,
+      'longitude': longitude,
     };
   }
 }

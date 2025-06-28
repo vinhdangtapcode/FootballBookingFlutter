@@ -21,7 +21,9 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         isLoading = false;
       });
-      if (user != null && user.role == 'OWNER') {
+      if (user != null && user.role == 'ADMIN') {
+        Navigator.pushNamedAndRemoveUntil(context, '/adminDashboard', (route) => false);
+      } else if (user != null && user.role == 'OWNER') {
         Navigator.pushNamedAndRemoveUntil(context, '/ownerMain', (route) => false);
       } else {
         Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
@@ -31,7 +33,7 @@ class _LoginScreenState extends State<LoginScreen> {
         isLoading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login failed. Please check your credentials.')),
+        SnackBar(content: Text('Đăng nhập thất bại! Vui lòng kiểm tra lại email và mật khẩu.')),
       );
     }
   }
@@ -127,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Google style login button (fake, for UI only)
                 OutlinedButton.icon(
                   onPressed: () {},
-                  icon: Image.asset('assets/images/google_logo.webp', height: 24),
+                  icon: Image.asset('lib/assets/images/google_logo.webp', height: 24),
                   label: Text(
                     "Đăng nhập với Google",
                     style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),

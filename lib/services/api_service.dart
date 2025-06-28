@@ -365,4 +365,148 @@ class ApiService {
     _token = null;
     _currentUser = null;
   }
+
+  // Admin Field Management APIs
+
+  // Lấy danh sách tất cả sân: GET /api/stadiums
+  static Future<List<Field>> getAllStadiums() async {
+    final url = Uri.parse("$baseUrl/api/stadiums");
+    final response = await http.get(url, headers: headers);
+    if (response.statusCode == 200) {
+      List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => Field.fromJson(json)).toList();
+    }
+    return [];
+  }
+
+  // Lấy thông tin sân theo ID: GET /api/stadiums/{id}
+  static Future<Field?> getStadiumById(int id) async {
+    final url = Uri.parse("$baseUrl/api/stadiums/$id");
+    final response = await http.get(url, headers: headers);
+    if (response.statusCode == 200) {
+      return Field.fromJson(jsonDecode(response.body));
+    }
+    return null;
+  }
+
+  // Lấy danh sách sân cho user: GET /api/stadiums/danh-sach-san
+  static Future<List<Field>> getStadiumsList() async {
+    final url = Uri.parse("$baseUrl/api/stadiums/danh-sach-san");
+    final response = await http.get(url, headers: headers);
+    if (response.statusCode == 200) {
+      List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => Field.fromJson(json)).toList();
+    }
+    return [];
+  }
+
+  // ===== ADMIN METHODS =====
+
+  // Thêm sân cho admin: POST /api/admin/fields
+  static Future<bool> adminCreateField(Field field) async {
+    final url = Uri.parse("$baseUrl/api/stadiums");
+    final response = await http.post(
+      url,
+      headers: headers,
+      body: jsonEncode(field.toJson()),
+    );
+    print('Admin Create Field - Status: ${response.statusCode}');
+    print('Admin Create Field - Response: ${response.body}');
+    return response.statusCode == 201 || response.statusCode == 200;
+  }
+
+  // Cập nhật thông tin sân cho admin: PUT /api/admin/fields/{id}
+  static Future<bool> adminUpdateField(Field field) async {
+    if (field.id == null) return false;
+    final url = Uri.parse("$baseUrl/api/stadiums/${field.id}");
+    final response = await http.put(
+      url,
+      headers: headers,
+      body: jsonEncode(field.toJson()),
+    );
+    print('Admin Update Field - Status: ${response.statusCode}');
+    print('Admin Update Field - Response: ${response.body}');
+    return response.statusCode == 200;
+  }
+
+  // Xóa sân cho admin: DELETE /api/admin/fields/{id}
+  static Future<bool> adminDeleteField(int fieldId) async {
+    final url = Uri.parse("$baseUrl/api/stadiums/$fieldId");
+    final response = await http.delete(url, headers: headers);
+    print('Admin Delete Field - Status: ${response.statusCode}');
+    print('Admin Delete Field - Response: ${response.body}');
+    return response.statusCode == 204 || response.statusCode == 200;
+  }
+
+  // ===== END ADMIN METHODS =====
+
+  // ===== ADMIN USER MANAGEMENT =====
+
+  // Lấy danh sách tất cả người dùng: GET /api/users
+  static Future<List<User>> getAllUsers() async {
+    final url = Uri.parse("$baseUrl/api/users");
+    final response = await http.get(url, headers: headers);
+    if (response.statusCode == 200) {
+      List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => User.fromJson(json)).toList();
+    }
+    return [];
+  }
+
+  // Lấy thông tin người dùng theo ID: GET /api/users/{id}
+  static Future<User?> getUserById(int userId) async {
+    final url = Uri.parse("$baseUrl/api/users/$userId");
+    final response = await http.get(url, headers: headers);
+    if (response.statusCode == 200) {
+      return User.fromJson(jsonDecode(response.body));
+    }
+    return null;
+  }
+
+  // Cập nhật thông tin người dùng (admin): PUT /api/users/{id}
+  static Future<bool> adminUpdateUser(int userId, Map<String, dynamic> userData) async {
+    final url = Uri.parse("$baseUrl/api/users/$userId");
+    final response = await http.put(
+      url,
+      headers: headers,
+      body: jsonEncode(userData),
+    );
+    return response.statusCode == 200;
+  }
+
+  // Xóa người dùng: DELETE /api/users/{id}
+  static Future<bool> adminDeleteUser(int userId) async {
+    final url = Uri.parse("$baseUrl/api/users/$userId");
+    final response = await http.delete(url, headers: headers);
+    return response.statusCode == 204 || response.statusCode == 200;
+  }
+
+  // Cập nhật trạng thái người dùng: PUT /api/users/{id}/status
+  static Future<bool> adminUpdateUserStatus(int userId, bool isActive) async {
+    final url = Uri.parse("$baseUrl/api/users/$userId/status");
+    final response = await http.put(
+      url,
+      headers: headers,
+      body: jsonEncode({"isActive": isActive}),
+    );
+    return response.statusCode == 200;
+  }
+
+  // Đặt lại mật khẩu người dùng: PUT /api/users/{id}/reset-password
+  static Future<bool> adminResetUserPassword(int userId, String newPassword) async {
+    final url = Uri.parse("$baseUrl/api/users/$userId/reset-password");
+    final response = await http.post(
+      url,
+      headers: headers,
+      body: jsonEncode({"newPassword": newPassword}),
+    );
+
+    print('Admin Reset Password - User ID: $userId');
+    print('Admin Reset Password - Status: ${response.statusCode}');
+    print('Admin Reset Password - Response: ${response.body}');
+
+    return response.statusCode == 200;
+  }
 }
+
+

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:football_booking_flutter/screens/admin_add_edit_field_screen.dart';
 import 'package:football_booking_flutter/screens/main_tab_scaffold.dart';
 import 'package:football_booking_flutter/screens/owner_edit_profile_screen.dart';
 import 'screens/login_screen.dart';
@@ -18,6 +19,10 @@ import 'screens/notifications_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/owner_main_tab_scaffold.dart';
 import 'screens/owner_notifications_screen.dart';
+import 'screens/map_screen.dart';
+import 'screens/location_picker_screen.dart';
+import 'screens/admin_dashboard_screen.dart';
+import 'models/field.dart';
 
 void main() {
   runApp(FootballBookingApp());
@@ -49,10 +54,13 @@ class FootballBookingApp extends StatelessWidget {
         '/fieldBookingHistory': (context) => FieldBookingHistoryScreen(),
         '/notifications': (context) => MainTabScaffold(initialIndex: 2),
         '/settings': (context) => MainTabScaffold(initialIndex: 3),
+        '/map': (context) => MapScreen(field: ModalRoute.of(context)!.settings.arguments as Field),
         '/ownerMain': (context) => OwnerMainTabScaffold(),
         '/ownerNotifications': (context) => OwnerMainTabScaffold(initialIndex: 1),
         '/ownerSettings': (context) => OwnerMainTabScaffold(initialIndex: 2),
         '/ownerEditProfile': (context) => OwnerEditProfileScreen(),
+        '/adminDashboard': (context) => AdminDashboardScreen(),
+        '/adminFieldForm': (context) => AdminAddEditFieldScreen(),
       },
     );
   }

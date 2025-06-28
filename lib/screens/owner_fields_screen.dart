@@ -140,19 +140,15 @@ class _OwnerFieldsScreenState extends State<OwnerFieldsScreen> {
                                       borderRadius: BorderRadius.circular(8.0),
                                       child: (field.imageUrl?.isEmpty ?? true)
                                           ? Image.asset(
-                                              'assets/images/san_bong.png',
+                                              'lib/assets/images/san_bong.png',
                                               fit: BoxFit.cover,
                                             )
                                           : Image.network(
                                               field.imageUrl!,
                                               fit: BoxFit.cover,
-                                              errorBuilder: (
-                                                context,
-                                                error,
-                                                stackTrace,
-                                              ) {
+                                              errorBuilder: (context, error, stackTrace) {
                                                 return Image.asset(
-                                                  'assets/images/san_bong.png',
+                                                  'lib/assets/images/san_bong.png',
                                                   fit: BoxFit.cover,
                                                 );
                                               },
