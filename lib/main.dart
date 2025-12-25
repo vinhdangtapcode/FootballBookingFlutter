@@ -24,6 +24,9 @@ import 'screens/location_picker_screen.dart';
 import 'screens/admin_dashboard_screen.dart';
 import 'models/field.dart';
 
+// Global RouteObserver để lắng nghe navigation events
+final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
+
 void main() {
   runApp(FootballBookingApp());
 }
@@ -37,6 +40,7 @@ class FootballBookingApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
+      navigatorObservers: [routeObserver], // Thêm RouteObserver
       initialRoute: '/login',
       routes: {
         '/login': (context) => LoginScreen(),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../main.dart'; // Import để sử dụng routeObserver
 import 'owner_fields_screen.dart';
 import 'owner_notifications_screen.dart';
 import 'owner_settings_screen.dart';
@@ -12,9 +14,10 @@ class OwnerMainTabScaffold extends StatefulWidget {
   State<OwnerMainTabScaffold> createState() => _OwnerMainTabScaffoldState();
 }
 
-class _OwnerMainTabScaffoldState extends State<OwnerMainTabScaffold> {
+class _OwnerMainTabScaffoldState extends State<OwnerMainTabScaffold> with WidgetsBindingObserver, RouteAware {
   late int _currentIndex;
-  int _unreadCount = 0;
+  int _newNotificationCount = 0;
+  List<int> _seenNotificationIds = [];
   final List<Widget> _screens = [
     OwnerFieldsScreen(),
     OwnerNotificationsScreen(),
@@ -25,20 +28,102 @@ class _OwnerMainTabScaffoldState extends State<OwnerMainTabScaffold> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
-    _fetchUnreadCount();
+    WidgetsBinding.instance.addObserver(this);
+    _loadSeenNotifications();
   }
 
-  Future<void> _fetchUnreadCount() async {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Đăng ký với RouteObserver
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Được gọi khi một route được pop và màn hình này trở nên visible lại
+  @override
+  void didPopNext() {
+    super.didPopNext();
+    // Refresh notification count khi back từ màn hình khác
+    _fetchNewNotificationCount();
+  }
+
+  // Khi app quay lại foreground, refresh notification count
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _fetchNewNotificationCount();
+    }
+  }
+
+  // Load danh sách ID thông báo đã xem từ SharedPreferences
+  Future<void> _loadSeenNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    final seenIds = prefs.getStringList('owner_seen_notification_ids') ?? [];
+    _seenNotificationIds = seenIds.map((id) => int.parse(id)).toList();
+    await _fetchNewNotificationCount();
+  }
+
+  // Lưu danh sách ID thông báo đã xem vào SharedPreferences
+  Future<void> _saveSeenNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      'owner_seen_notification_ids',
+      _seenNotificationIds.map((id) => id.toString()).toList(),
+    );
+  }
+
+  // Đếm số thông báo MỚI (chưa có trong danh sách đã xem)
+  Future<void> _fetchNewNotificationCount() async {
     final notis = await ApiService.getNotifications();
-    setState(() {
-      _unreadCount = notis.where((n) => n['read'] == false).length;
-    });
+    final newCount = notis.where((n) {
+      final id = n['id'];
+      return id != null && !_seenNotificationIds.contains(id);
+    }).length;
+    
+    if (mounted) {
+      setState(() {
+        _newNotificationCount = newCount;
+      });
+    }
+  }
+
+  // Đánh dấu tất cả thông báo hiện tại là "đã xem"
+  Future<void> _markAllAsSeen() async {
+    final notis = await ApiService.getNotifications();
+    for (var n in notis) {
+      final id = n['id'];
+      if (id != null && !_seenNotificationIds.contains(id)) {
+        _seenNotificationIds.add(id);
+      }
+    }
+    await _saveSeenNotifications();
+    if (mounted) {
+      setState(() {
+        _newNotificationCount = 0;
+      });
+    }
   }
 
   void _onTabTapped(int index) async {
+    if (index == _currentIndex) {
+      // Nếu đang ở tab hiện tại, refresh notification count
+      await _fetchNewNotificationCount();
+      return;
+    }
     setState(() => _currentIndex = index);
+    // Khi click vào tab thông báo, đánh dấu tất cả là đã xem
     if (index == 1) {
-      await _fetchUnreadCount();
+      await _markAllAsSeen();
+    } else {
+      // Refresh notification count khi chuyển tab khác
+      await _fetchNewNotificationCount();
     }
   }
 
@@ -62,7 +147,7 @@ class _OwnerMainTabScaffoldState extends State<OwnerMainTabScaffold> {
             icon: Stack(
               children: [
                 const Icon(Icons.chat),
-                if (_unreadCount > 0)
+                if (_newNotificationCount > 0)
                   Positioned(
                     right: 0,
                     top: 0,
@@ -77,7 +162,7 @@ class _OwnerMainTabScaffoldState extends State<OwnerMainTabScaffold> {
                         minHeight: 18,
                       ),
                       child: Text(
-                        '$_unreadCount',
+                        '$_newNotificationCount',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12,
@@ -97,4 +182,3 @@ class _OwnerMainTabScaffoldState extends State<OwnerMainTabScaffold> {
     );
   }
 }
-
