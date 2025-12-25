@@ -21,6 +21,11 @@ class ApiService {
     };
   }
 
+  // Set token manually (used for OAuth login)
+  static void setToken(String token) {
+    _token = token;
+  }
+
   // Đăng nhập: POST /api/users/login
   static Future<String?> login(String email, String password) async {
     final url = Uri.parse("$baseUrl/api/users/login");

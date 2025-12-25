@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/google_auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -10,6 +11,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   bool isLoading = false;
+  bool isGoogleLoading = false;
 
   void login() async {
     setState(() {
@@ -34,6 +36,57 @@ class _LoginScreenState extends State<LoginScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Đăng nhập thất bại! Vui lòng kiểm tra lại email và mật khẩu.')),
+      );
+    }
+  }
+
+  /// Handle Google Sign-In
+  void loginWithGoogle() async {
+    setState(() {
+      isGoogleLoading = true;
+    });
+
+    try {
+      final token = await GoogleAuthService.signInWithGoogle();
+      
+      if (token != null) {
+        // Set token in ApiService (we need to add this method)
+        ApiService.setToken(token);
+        
+        // Get user profile
+        final user = await ApiService.getProfile();
+        
+        setState(() {
+          isGoogleLoading = false;
+        });
+
+        if (user != null) {
+          if (user.role == 'ADMIN') {
+            Navigator.pushNamedAndRemoveUntil(context, '/adminDashboard', (route) => false);
+          } else if (user.role == 'OWNER') {
+            Navigator.pushNamedAndRemoveUntil(context, '/ownerMain', (route) => false);
+          } else {
+            Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Không thể lấy thông tin người dùng.')),
+          );
+        }
+      } else {
+        setState(() {
+          isGoogleLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Đăng nhập Google thất bại hoặc đã bị hủy.')),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        isGoogleLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi đăng nhập Google: $e')),
       );
     }
   }
@@ -126,21 +179,26 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
                 SizedBox(height: 24),
-                // Google style login button (fake, for UI only)
-                OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: Image.asset('lib/assets/images/google_logo.webp', height: 24),
-                  label: Text(
-                    "Đăng nhập với Google",
-                    style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.grey[300]!),
-                    backgroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                ),
+                // Google Sign-In button with loading state
+                isGoogleLoading
+                    ? CircularProgressIndicator(color: Colors.blue)
+                    : SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: loginWithGoogle,
+                          icon: Image.asset('lib/assets/images/google_logo.webp', height: 24),
+                          label: Text(
+                            "Đăng nhập với Google",
+                            style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: Colors.grey[300]!),
+                            backgroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                        ),
+                      ),
                 SizedBox(height: 32),
               ],
             ),
