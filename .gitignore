@@ -53,3 +53,9 @@ app.*.map.json
 
 # .gitignore should always be committed (do not ignore)
 
+# Google Services
+google-services.json
+android/app/google-services.json
+
+# API Keys
+lib/config/api_keys.dart
