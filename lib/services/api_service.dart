@@ -8,7 +8,8 @@ import '../models/rating.dart';
 import '../models/favorite.dart';
 
 // Thay thế bằng URL backend thực tế của bạn.
-const String baseUrl = "http://192.168.100.145:8080";
+// Thay thế bằng URL backend thực tế của bạn.
+const String baseUrl = "https://lazy-olives-fetch.loca.lt";
 
 class ApiService {
   static String? _token;
@@ -20,6 +21,7 @@ class ApiService {
   static Map<String, String> get headers {
     return {
       "Content-Type": "application/json",
+      "bypass-tunnel-reminder": "true", // Bypass localtunnel warning
       if (_token != null) "Authorization": "Bearer $_token",
     };
   }
