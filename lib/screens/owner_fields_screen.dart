@@ -85,6 +85,7 @@ class _OwnerFieldsScreenState extends State<OwnerFieldsScreen> {
     return Scaffold(
       backgroundColor: Color(0xFFF8F8F8),
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.amberAccent,
         elevation: 0,
         title: Container(

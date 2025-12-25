@@ -39,6 +39,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        centerTitle: true,
         title: Text("Cài đặt"),
         backgroundColor: Colors.amberAccent,
       ),

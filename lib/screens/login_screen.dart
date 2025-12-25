@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/google_auth_service.dart';
+import '../services/push_notification_service.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -19,6 +20,9 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     final token = await ApiService.login(emailController.text, passwordController.text);
     if (token != null) {
+      // Gửi FCM token lên backend sau khi đăng nhập
+      await PushNotificationService.sendTokenToBackend();
+      
       final user = await ApiService.getProfile();
       setState(() {
         isLoading = false;
@@ -50,17 +54,23 @@ class _LoginScreenState extends State<LoginScreen> {
       final token = await GoogleAuthService.signInWithGoogle();
       
       if (token != null) {
-        // Set token in ApiService (we need to add this method)
+        // Set token in ApiService
         ApiService.setToken(token);
         
-        // Get user profile
+        // Get user profile first to get role
         final user = await ApiService.getProfile();
         
-        setState(() {
-          isGoogleLoading = false;
-        });
-
         if (user != null) {
+          // Lưu token vào SharedPreferences để tự động đăng nhập
+          await ApiService.saveToken(token, user.role);
+          
+          // Gửi FCM token lên backend sau khi đăng nhập
+          await PushNotificationService.sendTokenToBackend();
+          
+          setState(() {
+            isGoogleLoading = false;
+          });
+
           if (user.role == 'ADMIN') {
             Navigator.pushNamedAndRemoveUntil(context, '/adminDashboard', (route) => false);
           } else if (user.role == 'OWNER') {
@@ -69,6 +79,9 @@ class _LoginScreenState extends State<LoginScreen> {
             Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
           }
         } else {
+          setState(() {
+            isGoogleLoading = false;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Không thể lấy thông tin người dùng.')),
           );

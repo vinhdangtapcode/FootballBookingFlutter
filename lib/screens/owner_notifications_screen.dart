@@ -57,6 +57,8 @@ class _OwnerNotificationsScreenState extends State<OwnerNotificationsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        centerTitle: true,
         title: const Text('Thông báo', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
         backgroundColor: Colors.white,
         elevation: 0,

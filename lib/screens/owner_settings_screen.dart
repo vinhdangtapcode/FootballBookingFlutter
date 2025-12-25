@@ -38,8 +38,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        centerTitle: true,
         title: Text("Cài đặt"),
         backgroundColor: Colors.amberAccent,
+        elevation: 0, // Đảm bảo giao diện phẳng nếu muốn
       ),
       body: isLoading
           ? Center(child: CircularProgressIndicator(color: Colors.amber))

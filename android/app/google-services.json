@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "223172584790",
+    "project_id": "footballbooking-b971d",
+    "storage_bucket": "footballbooking-b971d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:223172584790:android:c6e0b493a99df1b9f622f7",
+        "android_client_info": {
+          "package_name": "com.example.football_booking_flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBs0VyCHxhe5xrNrVTKrth603iWL4mM0Wo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

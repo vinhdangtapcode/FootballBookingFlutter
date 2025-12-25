@@ -165,6 +165,8 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        centerTitle: true,
         title: Text(selectedField != null
             ? "Lịch sử đặt sân: ${selectedField!.name}"
             : "Lịch sử đặt sân"),

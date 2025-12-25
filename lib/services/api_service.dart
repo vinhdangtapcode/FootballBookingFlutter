@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../models/field.dart';
 import '../models/booking.dart';
@@ -12,6 +13,8 @@ const String baseUrl = "http://192.168.100.145:8080";
 class ApiService {
   static String? _token;
   static User? _currentUser;
+  static const String _tokenKey = 'jwt_token';
+  static const String _userRoleKey = 'user_role';
 
   // Hàm tiện ích: nếu có token thì set Authorization.
   static Map<String, String> get headers {
@@ -24,6 +27,44 @@ class ApiService {
   // Set token manually (used for OAuth login)
   static void setToken(String token) {
     _token = token;
+  }
+
+  // Load token từ SharedPreferences khi khởi động app
+  static Future<bool> loadSavedToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedToken = prefs.getString(_tokenKey);
+    if (savedToken != null && savedToken.isNotEmpty) {
+      _token = savedToken;
+      return true;
+    }
+    return false;
+  }
+
+  // Lưu token vào SharedPreferences
+  static Future<void> saveToken(String token, String role) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_tokenKey, token);
+    await prefs.setString(_userRoleKey, role);
+  }
+
+  // Lấy role đã lưu
+  static Future<String?> getSavedRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_userRoleKey);
+  }
+
+  // Xóa token khi logout
+  static Future<void> clearToken() async {
+    _token = null;
+    _currentUser = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_tokenKey);
+    await prefs.remove(_userRoleKey);
+  }
+
+  // Kiểm tra xem có token không
+  static bool hasToken() {
+    return _token != null && _token!.isNotEmpty;
   }
 
   // Đăng nhập: POST /api/users/login
@@ -40,12 +81,20 @@ class ApiService {
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       _token = data["token"];
+      final role = data["role"] ?? "USER";
+      // Lưu token vào SharedPreferences
+      await saveToken(_token!, role);
       return _token;
     } else {
       // In log để debug thêm
       print("Login failed. Status: ${response.statusCode}. Body: ${response.body}");
       return null;
     }
+  }
+
+  // Đăng xuất: xóa token
+  static Future<void> logout() async {
+    await clearToken();
   }
 
   // Đăng ký người dùng: POST /api/users/register
@@ -365,12 +414,6 @@ class ApiService {
     return response.statusCode == 200 || response.statusCode == 204;
   }
 
-  // Đăng xuất: reset token và thông tin người dùng
-  static void logout() {
-    _token = null;
-    _currentUser = null;
-  }
-
   // Admin Field Management APIs
 
   // Lấy danh sách tất cả sân: GET /api/stadiums
@@ -512,6 +555,20 @@ class ApiService {
 
     return response.statusCode == 200;
   }
+
+  // Cập nhật FCM token cho user hiện tại
+  static Future<bool> updateFcmToken(String fcmToken) async {
+    final url = Uri.parse("$baseUrl/api/users/fcm-token");
+    try {
+      final response = await http.put(
+        url,
+        headers: headers,
+        body: jsonEncode({"fcmToken": fcmToken}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error updating FCM token: $e');
+      return false;
+    }
+  }
 }
-
-
