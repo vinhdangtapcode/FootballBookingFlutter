@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'home_screen.dart';
 import 'booking_history_screen.dart';
+import 'user_messages_screen.dart';
 import 'notifications_screen.dart';
 import 'settings_screen.dart';
 import '../services/api_service.dart';
@@ -18,10 +20,14 @@ class MainTabScaffold extends StatefulWidget {
 class _MainTabScaffoldState extends State<MainTabScaffold> with WidgetsBindingObserver, RouteAware {
   late int _currentIndex;
   int _newNotificationCount = 0;
+  int _unreadMessageCount = 0;
   List<int> _seenNotificationIds = [];
+  Timer? _pollingTimer;
+  
   final List<Widget> _screens = [
     HomeScreen(),
     BookingHistoryScreen(),
+    UserMessagesScreen(),
     NotificationsScreen(),
     SettingsScreen(),
   ];
@@ -32,6 +38,8 @@ class _MainTabScaffoldState extends State<MainTabScaffold> with WidgetsBindingOb
     _currentIndex = widget.initialIndex;
     WidgetsBinding.instance.addObserver(this);
     _loadSeenNotifications();
+    _fetchUnreadMessageCount();
+    _startPolling();
   }
 
   @override
@@ -43,24 +51,37 @@ class _MainTabScaffoldState extends State<MainTabScaffold> with WidgetsBindingOb
 
   @override
   void dispose() {
+    _pollingTimer?.cancel();
     routeObserver.unsubscribe(this);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  // Polling để cập nhật tin nhắn tự động (mỗi 2 giây)
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(Duration(seconds: 2), (timer) {
+      if (mounted) {
+        _fetchUnreadMessageCount();
+        _fetchNewNotificationCount();
+      }
+    });
   }
 
   // Được gọi khi một route được pop và màn hình này trở nên visible lại
   @override
   void didPopNext() {
     super.didPopNext();
-    // Refresh notification count khi back từ màn hình khác
+    // Refresh counts khi back từ màn hình khác
     _fetchNewNotificationCount();
+    _fetchUnreadMessageCount();
   }
 
-  // Khi app quay lại foreground, refresh notification count
+  // Khi app quay lại foreground, refresh counts
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _fetchNewNotificationCount();
+      _fetchUnreadMessageCount();
     }
   }
 
@@ -83,16 +104,41 @@ class _MainTabScaffoldState extends State<MainTabScaffold> with WidgetsBindingOb
 
   // Đếm số thông báo MỚI (chưa có trong danh sách đã xem)
   Future<void> _fetchNewNotificationCount() async {
-    final notis = await ApiService.getNotifications();
-    final newCount = notis.where((n) {
-      final id = n['id'];
-      return id != null && !_seenNotificationIds.contains(id);
-    }).length;
-    
-    if (mounted) {
-      setState(() {
-        _newNotificationCount = newCount;
-      });
+    try {
+      final notis = await ApiService.getNotifications();
+      final newCount = notis.where((n) {
+        final id = n['id'];
+        return id != null && !_seenNotificationIds.contains(id);
+      }).length;
+      
+      if (mounted) {
+        setState(() {
+          _newNotificationCount = newCount;
+        });
+      }
+    } catch (e) {
+      print('Error fetching notifications: $e');
+    }
+  }
+
+  // Đếm số tin nhắn chưa đọc
+  Future<void> _fetchUnreadMessageCount() async {
+    try {
+      final profile = await ApiService.getProfile();
+      if (profile != null && profile.id != null) {
+        final conversations = await ApiService.getConversationsForUser(profile.id!);
+        int totalUnread = 0;
+        for (var conv in conversations) {
+          totalUnread += (conv['unreadCount'] ?? 0) as int;
+        }
+        if (mounted) {
+          setState(() {
+            _unreadMessageCount = totalUnread;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error fetching unread messages: $e');
     }
   }
 
@@ -115,17 +161,23 @@ class _MainTabScaffoldState extends State<MainTabScaffold> with WidgetsBindingOb
 
   void _onTabTapped(int index) async {
     if (index == _currentIndex) {
-      // Nếu đang ở tab hiện tại, refresh notification count
+      // Nếu đang ở tab hiện tại, refresh counts
       await _fetchNewNotificationCount();
+      await _fetchUnreadMessageCount();
       return;
     }
     setState(() => _currentIndex = index);
-    // Khi click vào tab thông báo, đánh dấu tất cả là đã xem
+    // Xử lý theo tab
     if (index == 2) {
+      // Tab tin nhắn - refresh message count
+      await _fetchUnreadMessageCount();
+    } else if (index == 3) {
+      // Tab thông báo - đánh dấu đã xem
       await _markAllAsSeen();
     } else {
-      // Refresh notification count khi chuyển tab khác
+      // Refresh counts khi chuyển tab khác
       await _fetchNewNotificationCount();
+      await _fetchUnreadMessageCount();
     }
   }
 
@@ -149,7 +201,40 @@ class _MainTabScaffoldState extends State<MainTabScaffold> with WidgetsBindingOb
           BottomNavigationBarItem(
             icon: Stack(
               children: [
-                const Icon(Icons.chat),
+                const Icon(Icons.chat_bubble),
+                if (_unreadMessageCount > 0)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      child: Text(
+                        _unreadMessageCount > 99 ? '99+' : '$_unreadMessageCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            label: 'Tin nhắn',
+          ),
+          BottomNavigationBarItem(
+            icon: Stack(
+              children: [
+                const Icon(Icons.notifications),
                 if (_newNotificationCount > 0)
                   Positioned(
                     right: 0,
@@ -165,10 +250,10 @@ class _MainTabScaffoldState extends State<MainTabScaffold> with WidgetsBindingOb
                         minHeight: 18,
                       ),
                       child: Text(
-                        '$_newNotificationCount',
+                        _newNotificationCount > 99 ? '99+' : '$_newNotificationCount',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 12,
+                          fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,

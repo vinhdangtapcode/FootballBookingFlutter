@@ -7,9 +7,7 @@ import '../models/booking.dart';
 import '../models/rating.dart';
 import '../models/favorite.dart';
 
-// Thay thế bằng URL backend thực tế của bạn.
-// Thay thế bằng URL backend thực tế của bạn.
-const String baseUrl = "https://lazy-olives-fetch.loca.lt";
+const String baseUrl = "http://178.128.62.29:8080";
 
 class ApiService {
   static String? _token;
@@ -573,4 +571,144 @@ class ApiService {
       return false;
     }
   }
+
+  // ===== CHAT METHODS =====
+
+  // Tạo hoặc lấy cuộc hội thoại: POST /api/chat/conversations
+  static Future<Map<String, dynamic>?> getOrCreateConversation(int userId, int ownerId, int? fieldId) async {
+    final url = Uri.parse("$baseUrl/api/chat/conversations");
+    try {
+      final response = await http.post(
+        url,
+        headers: headers,
+        body: jsonEncode({
+          "userId": userId,
+          "ownerId": ownerId,
+          "fieldId": fieldId,
+        }),
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (e) {
+      print('Error creating conversation: $e');
+    }
+    return null;
+  }
+
+  // Lấy danh sách cuộc hội thoại của user: GET /api/chat/conversations/user/{userId}
+  static Future<List<Map<String, dynamic>>> getConversationsForUser(int userId) async {
+    final url = Uri.parse("$baseUrl/api/chat/conversations/user/$userId");
+    try {
+      final response = await http.get(url, headers: headers);
+      if (response.statusCode == 200) {
+        List<dynamic> data = jsonDecode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      }
+    } catch (e) {
+      print('Error getting conversations: $e');
+    }
+    return [];
+  }
+
+  // Lấy danh sách cuộc hội thoại của owner: GET /api/chat/conversations/owner/{ownerId}
+  static Future<List<Map<String, dynamic>>> getConversationsForOwner(int ownerId) async {
+    final url = Uri.parse("$baseUrl/api/chat/conversations/owner/$ownerId");
+    try {
+      final response = await http.get(url, headers: headers);
+      if (response.statusCode == 200) {
+        List<dynamic> data = jsonDecode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      }
+    } catch (e) {
+      print('Error getting owner conversations: $e');
+    }
+    return [];
+  }
+
+  // Lấy danh sách cuộc hội thoại của owner theo email: GET /api/chat/conversations/owner/email/{email}
+  static Future<List<Map<String, dynamic>>> getConversationsForOwnerByEmail(String email) async {
+    final url = Uri.parse("$baseUrl/api/chat/conversations/owner/email/$email");
+    try {
+      final response = await http.get(url, headers: headers);
+      if (response.statusCode == 200) {
+        List<dynamic> data = jsonDecode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      }
+    } catch (e) {
+      print('Error getting owner conversations by email: $e');
+    }
+    return [];
+  }
+
+  // Lấy owner ID theo email: GET /api/chat/owner-id/{email}
+  static Future<int?> getOwnerIdByEmail(String email) async {
+    final url = Uri.parse("$baseUrl/api/chat/owner-id/$email");
+    try {
+      final response = await http.get(url, headers: headers);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['ownerId'];
+      }
+    } catch (e) {
+      print('Error getting owner ID: $e');
+    }
+    return null;
+  }
+
+  // Lấy tin nhắn của cuộc hội thoại: GET /api/chat/conversations/{conversationId}/messages
+  static Future<List<Map<String, dynamic>>> getMessages(int conversationId) async {
+    final url = Uri.parse("$baseUrl/api/chat/conversations/$conversationId/messages");
+    try {
+      final response = await http.get(url, headers: headers);
+      if (response.statusCode == 200) {
+        List<dynamic> data = jsonDecode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      }
+    } catch (e) {
+      print('Error getting messages: $e');
+    }
+    return [];
+  }
+
+  // Gửi tin nhắn: POST /api/chat/messages
+  static Future<Map<String, dynamic>?> sendMessage(int conversationId, String senderType, int senderId, String content) async {
+    final url = Uri.parse("$baseUrl/api/chat/messages");
+    try {
+      final response = await http.post(
+        url,
+        headers: headers,
+        body: jsonEncode({
+          "conversationId": conversationId,
+          "senderType": senderType,
+          "senderId": senderId,
+          "content": content,
+        }),
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (e) {
+      print('Error sending message: $e');
+    }
+    return null;
+  }
+
+  // Đánh dấu tin nhắn đã đọc: POST /api/chat/conversations/{conversationId}/read
+  static Future<bool> markMessagesAsRead(int conversationId, String readerType) async {
+    final url = Uri.parse("$baseUrl/api/chat/conversations/$conversationId/read");
+    try {
+      final response = await http.post(
+        url,
+        headers: headers,
+        body: jsonEncode({"readerType": readerType}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error marking as read: $e');
+      return false;
+    }
+  }
+
+  // ===== END CHAT METHODS =====
 }

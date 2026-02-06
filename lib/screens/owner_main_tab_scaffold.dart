@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
@@ -5,6 +6,7 @@ import '../main.dart'; // Import để sử dụng routeObserver
 import 'owner_fields_screen.dart';
 import 'owner_notifications_screen.dart';
 import 'owner_settings_screen.dart';
+import 'owner_messages_screen.dart';
 
 class OwnerMainTabScaffold extends StatefulWidget {
   final int initialIndex;
@@ -17,9 +19,13 @@ class OwnerMainTabScaffold extends StatefulWidget {
 class _OwnerMainTabScaffoldState extends State<OwnerMainTabScaffold> with WidgetsBindingObserver, RouteAware {
   late int _currentIndex;
   int _newNotificationCount = 0;
+  int _unreadMessageCount = 0;
   List<int> _seenNotificationIds = [];
+  Timer? _pollingTimer;
+  
   final List<Widget> _screens = [
     OwnerFieldsScreen(),
+    OwnerMessagesScreen(),
     OwnerNotificationsScreen(),
     OwnerSettingsScreen(),
   ];
@@ -30,6 +36,8 @@ class _OwnerMainTabScaffoldState extends State<OwnerMainTabScaffold> with Widget
     _currentIndex = widget.initialIndex;
     WidgetsBinding.instance.addObserver(this);
     _loadSeenNotifications();
+    _fetchUnreadMessageCount();
+    _startPolling();
   }
 
   @override
@@ -41,9 +49,20 @@ class _OwnerMainTabScaffoldState extends State<OwnerMainTabScaffold> with Widget
 
   @override
   void dispose() {
+    _pollingTimer?.cancel();
     routeObserver.unsubscribe(this);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  // Polling để cập nhật tin nhắn tự động (mỗi 2 giây)
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(Duration(seconds: 2), (timer) {
+      if (mounted) {
+        _fetchUnreadMessageCount();
+        _fetchNewNotificationCount();
+      }
+    });
   }
 
   // Được gọi khi một route được pop và màn hình này trở nên visible lại
@@ -52,6 +71,7 @@ class _OwnerMainTabScaffoldState extends State<OwnerMainTabScaffold> with Widget
     super.didPopNext();
     // Refresh notification count khi back từ màn hình khác
     _fetchNewNotificationCount();
+    _fetchUnreadMessageCount();
   }
 
   // Khi app quay lại foreground, refresh notification count
@@ -59,6 +79,7 @@ class _OwnerMainTabScaffoldState extends State<OwnerMainTabScaffold> with Widget
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _fetchNewNotificationCount();
+      _fetchUnreadMessageCount();
     }
   }
 
@@ -94,6 +115,31 @@ class _OwnerMainTabScaffoldState extends State<OwnerMainTabScaffold> with Widget
     }
   }
 
+  // Đếm số tin nhắn chưa đọc
+  Future<void> _fetchUnreadMessageCount() async {
+    try {
+      final profile = await ApiService.getProfile();
+      if (profile != null && profile.email != null) {
+        // Lấy Owner ID theo email vì User ID và Owner ID khác nhau
+        final ownerId = await ApiService.getOwnerIdByEmail(profile.email!);
+        if (ownerId != null) {
+          final conversations = await ApiService.getConversationsForOwner(ownerId);
+          int totalUnread = 0;
+          for (var conv in conversations) {
+            totalUnread += (conv['unreadCount'] ?? 0) as int;
+          }
+          if (mounted) {
+            setState(() {
+              _unreadMessageCount = totalUnread;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      print('Error fetching unread messages: $e');
+    }
+  }
+
   // Đánh dấu tất cả thông báo hiện tại là "đã xem"
   Future<void> _markAllAsSeen() async {
     final notis = await ApiService.getNotifications();
@@ -113,17 +159,22 @@ class _OwnerMainTabScaffoldState extends State<OwnerMainTabScaffold> with Widget
 
   void _onTabTapped(int index) async {
     if (index == _currentIndex) {
-      // Nếu đang ở tab hiện tại, refresh notification count
+      // Nếu đang ở tab hiện tại, refresh counts
       await _fetchNewNotificationCount();
+      await _fetchUnreadMessageCount();
       return;
     }
     setState(() => _currentIndex = index);
     // Khi click vào tab thông báo, đánh dấu tất cả là đã xem
-    if (index == 1) {
+    if (index == 2) {
       await _markAllAsSeen();
+    } else if (index == 1) {
+      // Refresh message count khi vào tab tin nhắn
+      await _fetchUnreadMessageCount();
     } else {
-      // Refresh notification count khi chuyển tab khác
+      // Refresh counts khi chuyển tab khác
       await _fetchNewNotificationCount();
+      await _fetchUnreadMessageCount();
     }
   }
 
@@ -146,7 +197,40 @@ class _OwnerMainTabScaffoldState extends State<OwnerMainTabScaffold> with Widget
           BottomNavigationBarItem(
             icon: Stack(
               children: [
-                const Icon(Icons.chat),
+                const Icon(Icons.chat_bubble),
+                if (_unreadMessageCount > 0)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      child: Text(
+                        '$_unreadMessageCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            label: 'Tin nhắn',
+          ),
+          BottomNavigationBarItem(
+            icon: Stack(
+              children: [
+                const Icon(Icons.notifications),
                 if (_newNotificationCount > 0)
                   Positioned(
                     right: 0,

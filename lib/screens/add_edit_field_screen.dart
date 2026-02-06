@@ -46,10 +46,26 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
         lengthController.text = field!.length?.toString() ?? "70";
         widthController.text = field!.width?.toString() ?? "50";
         grassTypeController.text = field!.grassType ?? "";
-        openingTimeController.text = field!.openingTime ?? "";
-        closingTimeController.text = field!.closingTime ?? "";
-        available = field!.available ?? true;
-        outdoor = field!.outdoor ?? true;
+        if (field!.openingTime != null && field!.openingTime!.isNotEmpty) {
+          try {
+            int h = int.parse(field!.openingTime!.split(':')[0]);
+            openingTimeController.text = '${h}h';
+          } catch (_) {
+            openingTimeController.text = field!.openingTime!;
+          }
+        }
+        
+        if (field!.closingTime != null && field!.closingTime!.isNotEmpty) {
+          try {
+            int h = int.parse(field!.closingTime!.split(':')[0]);
+            closingTimeController.text = '${h}h';
+          } catch (_) {
+            closingTimeController.text = field!.closingTime!;
+          }
+        }
+        if (field!.latitude != null && field!.longitude != null) {
+          selectedLocation = LatLng(field!.latitude!, field!.longitude!);
+        }
       } else {
         lengthController.text = "70";
         widthController.text = "50";
@@ -64,10 +80,20 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
         isLoading = true;
       });
       // Đảm bảo openingTime/closingTime đúng định dạng HH:mm:ss
-      String opening = openingTimeController.text.trim();
-      String closing = closingTimeController.text.trim();
-      if (opening.length == 5) opening += ':00';
-      if (closing.length == 5) closing += ':00';
+      String openingStr = openingTimeController.text.trim();
+      String closingStr = closingTimeController.text.trim();
+      
+      String opening = "";
+      if (openingStr.isNotEmpty) {
+         int h = int.tryParse(openingStr.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+         opening = '${h.toString().padLeft(2, '0')}:00:00';
+      }
+
+      String closing = "";
+      if (closingStr.isNotEmpty) {
+         int h = int.tryParse(closingStr.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+         closing = '${h.toString().padLeft(2, '0')}:00:00';
+      }
       Field newField = Field(
         id: field?.id,
         name: nameController.text,
@@ -82,6 +108,8 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
         closingTime: closing,
         available: available,
         outdoor: outdoor,
+        latitude: selectedLocation?.latitude ?? field?.latitude,
+        longitude: selectedLocation?.longitude ?? field?.longitude,
       );
       if (field == null) {
         // Tạo mới sân
@@ -270,6 +298,96 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
     }
   }
 
+  Future<int?> _selectHour(BuildContext context, int initialHour, String title, {int? minHour, int? maxHour}) async {
+    return await showDialog<int>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber[800]), textAlign: TextAlign.center),
+          content: Container(
+            width: double.maxFinite,
+            height: 300,
+            child: GridView.builder(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 1,
+              ),
+              itemCount: 25,
+              itemBuilder: (context, index) {
+                int hour = index;
+                bool isSelected = hour == initialHour;
+                
+                // Check if disabled
+                bool isDisabled = false;
+                if (minHour != null && hour < minHour) isDisabled = true;
+                if (maxHour != null && hour > maxHour) isDisabled = true;
+                
+                if (isDisabled) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[200]!),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      '${hour}h',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.grey[400],
+                      ),
+                    ),
+                  );
+                }
+                
+                return Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => Navigator.pop(context, hour),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.amber : Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected ? Colors.amber[700]! : Colors.grey[300]!,
+                          width: isSelected ? 2 : 1,
+                        ),
+                        boxShadow: isSelected
+                            ? [BoxShadow(color: Colors.amber.withOpacity(0.4), blurRadius: 6, offset: Offset(0, 3))]
+                            : [],
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '${hour}h',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                          color: isSelected ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("Hủy", style: TextStyle(color: Colors.grey)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     String title = field == null ? "Thêm sân mới" : "Chỉnh sửa sân";
@@ -328,9 +446,14 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
                     ),
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty || selectedLocation == null) {
+                    if (value == null || value.isEmpty) {
                       return "Vui lòng chọn vị trí trên bản đồ";
                     }
+                    // Nếu tạo mới, bắt buộc phải có location
+                    if (field == null && selectedLocation == null) {
+                       return "Vui lòng chọn vị trí trên bản đồ";
+                    }
+                    // Nếu edit, cho phép pass nếu đã có address text (kể cả khi không có tọa độ)
                     return null;
                   },
                   onTap: () {
@@ -451,67 +574,86 @@ class _AddEditFieldScreenState extends State<AddEditFieldScreen> {
                   ),
                 ),
                 SizedBox(height: 18),
-                TextFormField(
-                  controller: openingTimeController,
-                  readOnly: true,
-                  onTap: () async {
-                    final TimeOfDay? picked = await showTimePicker(
-                      context: context,
-                      initialTime: openingTimeController.text.isNotEmpty
-                        ? TimeOfDay(
-                            hour: int.tryParse(openingTimeController.text.split(":")[0]) ?? 7,
-                            minute: int.tryParse(openingTimeController.text.split(":")[1]) ?? 0)
-                        : TimeOfDay(hour: 7, minute: 0),
-                    );
-                    if (picked != null) {
-                      setState(() {
-                        openingTimeController.text = picked.format(context);
-                        // Lưu lại theo định dạng HH:mm
-                        final hour = picked.hour.toString().padLeft(2, '0');
-                        final min = picked.minute.toString().padLeft(2, '0');
-                        openingTimeController.text = '$hour:$min';
-                      });
-                    }
-                  },
-                  decoration: InputDecoration(
-                    labelText: "Giờ mở cửa (HH:mm)",
-                    prefixIcon: Icon(Icons.access_time, color: Colors.purple),
-                    filled: true,
-                    fillColor: Colors.amber[50],
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  keyboardType: TextInputType.datetime,
-                ),
-                SizedBox(height: 18),
-                TextFormField(
-                  controller: closingTimeController,
-                  readOnly: true,
-                  onTap: () async {
-                    final TimeOfDay? picked = await showTimePicker(
-                      context: context,
-                      initialTime: closingTimeController.text.isNotEmpty
-                        ? TimeOfDay(
-                            hour: int.tryParse(closingTimeController.text.split(":")[0]) ?? 22,
-                            minute: int.tryParse(closingTimeController.text.split(":")[1]) ?? 0)
-                        : TimeOfDay(hour: 22, minute: 0),
-                    );
-                    if (picked != null) {
-                      setState(() {
-                        closingTimeController.text = picked.format(context);
-                        final hour = picked.hour.toString().padLeft(2, '0');
-                        final min = picked.minute.toString().padLeft(2, '0');
-                        closingTimeController.text = '$hour:$min';
-                      });
-                    }
-                  },
-                  decoration: InputDecoration(
-                    labelText: "Giờ đóng cửa (HH:mm)",
-                    prefixIcon: Icon(Icons.access_time, color: Colors.deepPurple),
-                    filled: true,
-                    fillColor: Colors.amber[50],
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  keyboardType: TextInputType.datetime,
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: openingTimeController,
+                        readOnly: true,
+                        onTap: () async {
+                          int initial = 7;
+                          if (openingTimeController.text.isNotEmpty) {
+                            try {
+                              initial = int.parse(openingTimeController.text.replaceAll(RegExp(r'[^0-9]'), ''));
+                            } catch (_) {}
+                          }
+                          
+                          int? maxHour;
+                          if (closingTimeController.text.isNotEmpty) {
+                             try {
+                              maxHour = int.parse(closingTimeController.text.replaceAll(RegExp(r'[^0-9]'), '')) - 1;
+                            } catch (_) {}
+                          }
+                          
+                          final int? pickedHour = await _selectHour(context, initial, "Chọn giờ mở cửa", maxHour: maxHour);
+                          
+                          if (pickedHour != null) {
+                            setState(() {
+                              openingTimeController.text = '${pickedHour}h';
+                            });
+                          }
+                        },
+                        decoration: InputDecoration(
+                          labelText: "Mở cửa",
+                          hintText: "6h",
+                          prefixIcon: Icon(Icons.access_time, color: Colors.purple),
+                          filled: true,
+                          fillColor: Colors.amber[50],
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: closingTimeController,
+                        readOnly: true,
+                        onTap: () async {
+                          int initial = 22;
+                          if (closingTimeController.text.isNotEmpty) {
+                            try {
+                              initial = int.parse(closingTimeController.text.replaceAll(RegExp(r'[^0-9]'), ''));
+                            } catch (_) {}
+                          }
+                          
+                          int? minHour;
+                          if (openingTimeController.text.isNotEmpty) {
+                             try {
+                              minHour = int.parse(openingTimeController.text.replaceAll(RegExp(r'[^0-9]'), '')) + 1;
+                            } catch (_) {}
+                          }
+                          
+                          final int? pickedHour = await _selectHour(context, initial, "Chọn giờ đóng cửa", minHour: minHour);
+                          
+                          if (pickedHour != null) {
+                            setState(() {
+                              closingTimeController.text = '${pickedHour}h';
+                            });
+                          }
+                        },
+                        decoration: InputDecoration(
+                          labelText: "Đóng cửa",
+                          hintText: "22h",
+                          prefixIcon: Icon(Icons.access_time_filled, color: Colors.deepPurple),
+                          filled: true,
+                          fillColor: Colors.amber[50],
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 SizedBox(height: 18),
                 SwitchListTile(

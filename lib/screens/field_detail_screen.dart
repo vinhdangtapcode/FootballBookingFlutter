@@ -79,6 +79,65 @@ class _FieldDetailScreenState extends State<FieldDetailScreen> {
     }
   }
 
+  Future<void> _openChat() async {
+    if (field?.owner == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không tìm thấy thông tin chủ sân'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    // Lấy thông tin user hiện tại
+    final currentUser = await ApiService.getProfile();
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Vui lòng đăng nhập để nhắn tin'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
+    // Hiển thị loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(child: CircularProgressIndicator(color: Colors.amber)),
+    );
+
+    try {
+      // Tạo hoặc lấy conversation
+      final conversation = await ApiService.getOrCreateConversation(
+        currentUser.id!,
+        field!.owner!.id,
+        field!.id,
+      );
+
+      Navigator.pop(context); // Đóng loading
+
+      if (conversation != null && conversation['id'] != null) {
+        Navigator.pushNamed(
+          context,
+          '/chat',
+          arguments: {
+            'conversationId': conversation['id'],
+            'currentUserId': currentUser.id,
+            'currentUserType': 'USER',
+            'otherPartyName': field!.owner!.ownerName,
+            'fieldName': field!.name,
+          },
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể tạo cuộc hội thoại'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      Navigator.pop(context); // Đóng loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Đã xảy ra lỗi: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (field == null) {
@@ -180,10 +239,25 @@ class _FieldDetailScreenState extends State<FieldDetailScreen> {
                           const Icon(Icons.person, color: Colors.amber),
                           const SizedBox(width: 8),
                           Text('Chủ sân: ', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
-                          Text(
-                            field!.owner?.ownerName ?? '-',
-                            style: TextStyle(fontSize: 16),
+                          Expanded(
+                            child: Text(
+                              field!.owner?.ownerName ?? '-',
+                              style: TextStyle(fontSize: 16),
+                            ),
                           ),
+                          if (field!.owner != null)
+                            IconButton(
+                              icon: Container(
+                                padding: EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.shade100,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(Icons.chat_bubble_outline, color: Colors.amber.shade800, size: 20),
+                              ),
+                              onPressed: () => _openChat(),
+                              tooltip: 'Nhắn tin cho chủ sân',
+                            ),
                         ],
                       ),
                       const SizedBox(height: 16),

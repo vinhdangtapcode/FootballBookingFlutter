@@ -25,6 +25,7 @@ import 'screens/owner_notifications_screen.dart';
 import 'screens/map_screen.dart';
 import 'screens/location_picker_screen.dart';
 import 'screens/admin_dashboard_screen.dart';
+import 'screens/chat_screen.dart';
 import 'models/field.dart';
 import 'screens/splash_screen.dart';
 
@@ -84,6 +85,7 @@ class FootballBookingApp extends StatelessWidget {
         '/ownerEditProfile': (context) => OwnerEditProfileScreen(),
         '/adminDashboard': (context) => AdminDashboardScreen(),
         '/adminFieldForm': (context) => AdminAddEditFieldScreen(),
+        '/chat': (context) => ChatScreen(),
       },
     );
   }
